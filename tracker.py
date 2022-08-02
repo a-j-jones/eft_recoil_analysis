@@ -7,7 +7,7 @@ import json
 from tqdm import tqdm
 
 # Typing:
-from typing import Tuple
+from typing import Tuple, Optional
 from numpy import ndarray
 
 
@@ -153,8 +153,10 @@ class Tracker:
 		"""
 		Loops through every frame in the video file and tracks each object which has been selected by the user.
 		"""
-		cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
-		cv2.moveWindow("Frame", 40, 30)
+		if self.debug:
+			cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+			cv2.moveWindow("Frame", 40, 30)
+
 		with tqdm(total=self.length) as pbar:
 			while True:
 				# Get new frame from the video:
@@ -191,11 +193,16 @@ class Tracker:
 			self.cap.release()
 			cv2.destroyAllWindows()
 
-	def save(self, filename: str):
+	def save(self, filename: Optional[str] = None):
 		"""
 		Saves the positional data to a given JSON file.
 		@param filename:    JSON file path (e.g. position_data.json)
 		"""
+
+		if not filename:
+			file_stripped = self.video_file.split("\\")[-1].split(".")[0]
+			filename = f"{file_stripped}.json"
+
 		if not self.data:
 			print(f"No data has been recorded yet.")
 		else:

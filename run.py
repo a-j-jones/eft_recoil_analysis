@@ -1,10 +1,11 @@
 from tracker import Tracker
+from glob import glob
 
-# ADD FILENAME:
-filename = ""
-output_filename = ""
+folder = "videos"
+trackers = [Tracker(file) for file in glob(f"{folder}/*.mp4")]
 
-# Track video file:
-t = Tracker(filename, debug=True)
-t.track()
-t.save(output_filename)
+for tracker in trackers:
+	tracker.track()
+	tracker.save()
+
+
