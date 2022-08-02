@@ -5,6 +5,8 @@ The tool is specifically designed for use within Escape From Tarkov, however in 
 
 ![recoil_cropped](https://user-images.githubusercontent.com/64594018/182376402-5c842ed5-0ca1-4258-acfa-5d9ea6efeac9.gif)
 
+![analysis](https://user-images.githubusercontent.com/64594018/182401951-8336208e-e8bc-4acb-b305-cb6de584eecb.PNG)
+
 For best results in EFT:
  - Begin and end the recording (or cut the video file afterwards) with the weapon ADS'd right before and right after shooting.
  - A relatively short video clip will mean that you don't waste time tracking outside of the spray pattern (though the tool should take too long to run per clip).
@@ -15,7 +17,6 @@ For best results in EFT:
     - Night time (important for video contrast, day-time introduces )
     - Stand at pumping station, look towards Gate 3 extract / Delivery from the past objective.
       this should mean that your bullets hit farther away, reducing the impact that sparks will have on the video tracking.
-
 
 ## Example
 
