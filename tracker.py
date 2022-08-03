@@ -4,6 +4,7 @@ from selector import Selector
 # Public packages:
 import cv2
 import json
+import numpy as np
 from tqdm import tqdm
 
 # Typing:
@@ -161,17 +162,17 @@ class Tracker:
 			while True:
 				# Get new frame from the video:
 				ret, self.frame = self.cap.read()
-
-				try:
-					# Convert frame to Grayscale
-					self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
-					self.frame_id += 1
-				except cv2.error:
+				if not ret:
 					break
+
+				# Convert frame to Grayscale
+				self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
+				self.frame_id += 1
 
 				# Track objects:
 				self.track_object(self.reticle)
 				self.track_object(self.camera)
+
 				self.data.append({
 					"filename": self.video_file,
 					"frame": self.frame_id,
@@ -185,7 +186,7 @@ class Tracker:
 						print(self.frame.shape)
 						cv2.resizeWindow("Frame", self.frame.shape[1], self.frame.shape[0])
 					cv2.imshow("Frame", self.frame)
-					cv2.waitKey(16)
+					cv2.waitKey(15)
 
 				pbar.update()
 
