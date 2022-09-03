@@ -6,7 +6,7 @@ import cv2
 import json
 import numpy as np
 from tqdm import tqdm
-from scipy import stats
+from imutils.video import FileVideoStream
 
 # Typing:
 from typing import Tuple, Optional
@@ -117,10 +117,15 @@ class Tracker:
 		self.reticle = TrackedObject(self.selector, name="Reticle")
 		self.selector.close()
 		self.original_points = None
+		self.new_points = self.old_points = None
 
 		# ------------------------ Capture ------------------------
-		self.cap = cv2.VideoCapture(video_file)
-		self.length = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+		self.cap = FileVideoStream(video_file, queue_size=512).start()
+
+		# Get number of frames:
+		video = cv2.VideoCapture(video_file)
+		self.length = video.get(cv2.CAP_PROP_FRAME_COUNT)
+		video.release()
 
 		# ----------------------- Debugging -----------------------
 		self.debug_level = debug_level
@@ -131,8 +136,10 @@ class Tracker:
 			maxLevel=2,
 			criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
 		)
+
+		maxCorners = 35
 		feature_params = dict(
-			maxCorners=200,
+			maxCorners=maxCorners,
 			qualityLevel=0.1,
 			minDistance=10,
 			blockSize=7
@@ -146,30 +153,33 @@ class Tracker:
 		curr_frame = self.frame_grey[y1:y2, x1:x2]
 		prev_frame = self.prev_frame[y1:y2, x1:x2]
 
-		old_points = cv2.goodFeaturesToTrack(prev_frame,
-		                                     **feature_params)
+		if self.new_points is None or len(self.new_points) < (maxCorners * 0.75):
+			self.old_points = cv2.goodFeaturesToTrack(prev_frame,
+			                                     **feature_params)
+		else:
+			self.old_points = self.new_points.reshape(len(self.new_points), 1, 2)
 
-		new_points, status, error = cv2.calcOpticalFlowPyrLK(prev_frame,
+		self.new_points, status, error = cv2.calcOpticalFlowPyrLK(prev_frame,
 		                                                     curr_frame,
-		                                                     old_points,
+		                                                     self.old_points,
 		                                                     None,
 		                                                     **lk_params)
 
 		idx = np.where(status == 1)
-		new_points = new_points[idx]
-		old_points = old_points[idx]
+		self.new_points = self.new_points[idx]
+		self.old_points = self.old_points[idx]
 
 		# ----------------------------- START DEBUGGING -----------------------------
 		if self.debug_level == 1:
 			cv2.rectangle(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
-			for new, old in zip(new_points, old_points):
+			for new, old in zip(self.new_points, self.old_points):
 				cv2.line(self.frame,
 				         (int(new[0]+x1), int(new[1]+y1)),
 				         (int(old[0]+x1), int(old[1]+y1)),
 				         (0, 255, 0), thickness=4, lineType=8)
 		# ------------------------------ END DEBUGGING ------------------------------
 
-		movement = new_points - old_points
+		movement = self.new_points - self.old_points
 
 		# Median:
 		x_average = np.median(movement[:, 0])
@@ -212,11 +222,14 @@ class Tracker:
 		# 	cv2.moveWindow("Frame", 40, 30)
 
 		with tqdm(total=self.length) as pbar:
-			while True:
+			while self.cap.more():
 				# Get new frame from the video:
-				ret, self.frame = self.cap.read()
-				if not ret:
+				self.frame = self.cap.read()
+				if self.frame is None:
 					break
+
+				cv2.putText(self.frame, "Queue Size: {}".format(self.cap.Q.qsize()),
+				            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
 				# Convert frame to Grayscale
 				self.frame_grey = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
@@ -249,7 +262,7 @@ class Tracker:
 				pbar.update()
 
 			pbar.close()
-			self.cap.release()
+			self.cap.stop()
 			cv2.destroyAllWindows()
 
 	def save(self, filename: Optional[str] = None):
