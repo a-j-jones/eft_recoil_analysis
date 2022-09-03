@@ -6,6 +6,7 @@ import cv2
 import json
 import numpy as np
 from tqdm import tqdm
+from scipy import stats
 
 # Typing:
 from typing import Tuple, Optional
@@ -95,7 +96,7 @@ class TrackedObject:
 
 
 class Tracker:
-	def __init__(self, video_file: str, debug: bool = False):
+	def __init__(self, video_file: str, debug_level: int = 0):
 		"""
 		Initialises Tracker class which will track objects in a 2D space using cv2. The class records coordinates
 		data for the position of tracked objects which can be used to calculate the recoil of a weapon in EFT.
@@ -103,12 +104,12 @@ class Tracker:
 		Additional data recorded includes the frame number and video file path.
 
 		@param video_file:  File path for the video file to be analysed.
-		@param debug:       Boolean value to enable debug-mode (shows the tracking on screen in real-time).
+		@param debug_level: Integer value to define level of debugging.
 		"""
 		# ----------------- Initialise frame data -----------------
 		self.data = []
 		self.frame_id = 0
-		self.frame = None
+		self.frame_grey = self.frame = self.prev_frame = self.orig_frame = None
 		self.video_file = video_file
 
 		# -------------------- Tracking points --------------------
@@ -116,13 +117,74 @@ class Tracker:
 		self.reticle = TrackedObject(self.selector, name="Reticle")
 		self.camera = TrackedObject(self.selector, name="Camera")
 		self.selector.close()
+		self.original_points = None
 
 		# ------------------------ Capture ------------------------
 		self.cap = cv2.VideoCapture(video_file)
 		self.length = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
 
 		# ----------------------- Debugging -----------------------
-		self.debug = debug
+		self.debug_level = debug_level
+
+	def track_camera(self, window_pct=((0, 0), (0.40, 1.00))):
+		# Lucas kanade params
+		lk_params = dict(winSize=(30, 30),
+		                 maxLevel=4,
+		                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+		x1 = int(self.frame_grey.shape[1] * window_pct[0][1])
+		x2 = int(self.frame_grey.shape[1] * window_pct[1][1])
+		y1 = int(self.frame_grey.shape[0] * window_pct[0][0])
+		y2 = int(self.frame_grey.shape[0] * window_pct[1][0])
+		curr_frame = self.frame_grey.copy()[x1:x2, y1:y2]
+		prev_frame = self.prev_frame.copy()[x1:x2, y1:y2]
+
+		old_points = cv2.goodFeaturesToTrack(prev_frame,
+		                                     maxCorners=200,
+		                                     qualityLevel=0.01,
+		                                     minDistance=2,
+		                                     useHarrisDetector=True,
+		                                     k=0.03)
+
+		new_points, status, error = cv2.calcOpticalFlowPyrLK(prev_frame,
+		                                                     curr_frame,
+		                                                     old_points,
+		                                                     None,
+		                                                     **lk_params)
+
+		idx = np.where(status == 1)
+		new_points = new_points[idx]
+		old_points = old_points[idx]
+
+		# ----------------------------- START DEBUGGING -----------------------------
+		if self.debug_level == 1:
+			for new, old in zip(new_points, old_points):
+				cv2.line(self.frame,
+				         (int(new[0]), int(new[1])),
+				         (int(old[0]), int(old[1])),
+				         (0, 255, 0), thickness=2, lineType=8)
+
+		elif self.debug_level == 2:
+			check_frame = self.frame.copy()
+			for pt in new_points:
+				cv2.circle(check_frame, (int(pt[0]), int(pt[1])), 3, (255, 0, 0), 3)
+
+			cv2.imshow("Checking", check_frame)
+			cv2.waitKey(60)
+		# ------------------------------ END DEBUGGING ------------------------------
+
+		movement = new_points - old_points
+		movement_round = np.round_(movement, decimals=2)
+
+		# Median:
+		x_average = np.mean(movement[:, 0])
+		y_average = np.mean(movement[:, 1])
+
+		# Mode:
+		x_average = stats.mode(movement_round[:, 0]).mode[0]
+		y_average = stats.mode(movement_round[:, 1]).mode[0]
+
+		return str(x_average), str(y_average)
 
 	def track_object(self, obj: TrackedObject):
 		"""
@@ -130,7 +192,7 @@ class Tracker:
 		on the frame for debugging purposes.
 		@param obj:     TrackedObject object (e.g. Reticle / Camera)
 		"""
-		top_left, bottom_right = matchSymbol(img=self.frame,
+		top_left, bottom_right = matchSymbol(img=self.frame_grey,
 		                                     template=obj.img,
 		                                     search_area=obj.search_area
 		                                     )
@@ -154,7 +216,7 @@ class Tracker:
 		"""
 		Loops through every frame in the video file and tracks each object which has been selected by the user.
 		"""
-		if self.debug:
+		if self.debug_level:
 			cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
 			cv2.moveWindow("Frame", 40, 30)
 
@@ -166,25 +228,37 @@ class Tracker:
 					break
 
 				# Convert frame to Grayscale
-				self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
+				self.frame_grey = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
 				self.frame_id += 1
+
+				# Track camera:
+				if self.frame_id > 1:
+					camera_shake = self.track_camera()
+				else:
+					self.orig_frame = self.frame_grey.copy()
+					camera_shake = (0, 0)
+				self.prev_frame = self.frame_grey.copy()
 
 				# Track objects:
 				self.track_object(self.reticle)
 				self.track_object(self.camera)
 
+
 				self.data.append({
 					"filename": self.video_file,
 					"frame": self.frame_id,
 					"reticle": self.reticle.middle,
-					"camera recoil": self.camera.middle
+					"camera recoil": self.camera.middle,
+					"camera shake": camera_shake
 				})
 
 				# Show frame:
-				if self.debug:
+				if self.debug_level > 0:
 					if self.frame_id == 1:
-						print(self.frame.shape)
-						cv2.resizeWindow("Frame", self.frame.shape[1], self.frame.shape[0])
+						scale = 0.8
+						width = int(self.frame.shape[1]*scale)
+						height = int(self.frame.shape[0]*scale)
+						cv2.resizeWindow("Frame", width, height)
 					cv2.imshow("Frame", self.frame)
 					cv2.waitKey(15)
 
