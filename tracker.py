@@ -143,8 +143,8 @@ class Tracker:
 		y1 = int(self.frame_grey.shape[0] * window_pct[0][0])
 		y2 = int(self.frame_grey.shape[0] * window_pct[1][0])
 
-		curr_frame = self.frame_grey.copy()[y1:y2, x1:x2]
-		prev_frame = self.prev_frame.copy()[y1:y2, x1:x2]
+		curr_frame = self.frame_grey[y1:y2, x1:x2]
+		prev_frame = self.prev_frame[y1:y2, x1:x2]
 
 		old_points = cv2.goodFeaturesToTrack(prev_frame,
 		                                     **feature_params)
@@ -226,9 +226,9 @@ class Tracker:
 				if self.frame_id > 1:
 					camera_shake = self.track_camera()
 				else:
-					self.orig_frame = self.frame_grey.copy()
+					self.orig_frame = self.frame_grey
 					camera_shake = (0, 0)
-				self.prev_frame = self.frame_grey.copy()
+				self.prev_frame = self.frame_grey
 
 				# Track objects:
 				self.track_object(self.reticle)
