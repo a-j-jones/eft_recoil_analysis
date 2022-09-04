@@ -35,7 +35,7 @@ def get_middle(point1: Tuple[int, int], point2: Tuple[int, int]) -> Tuple[int, i
 
 
 def matchSymbol(img: ndarray, template: ndarray,
-                search_area: Tuple[Tuple[int, int], Tuple[int, int]] = None) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+                search_area: Tuple[Tuple[int, int], Tuple[int, int]] = None) -> Tuple[Tuple[int, int], Tuple[int, int], int]:
 	"""
 	Match a template image within a larger image using cv2.matchTemplate, returns the Top-Left
 	and Bottom-Right coordinates of the template image at the matched location.
@@ -54,15 +54,17 @@ def matchSymbol(img: ndarray, template: ndarray,
 	if search_area:
 		(x1, y1), (x2, y2) = search_area
 		img = img[y1:y2, x1:x2]
+	else:
+		x1 = y1 = 0
 
 	# Apply template Matching
-	res = cv2.matchTemplate(img, template, cv2.TM_CCOEFF)
+	res = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
 	min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 
 	top_left = (max_loc[0] + x1, max_loc[1] + y1)
 	bottom_right = (top_left[0] + w, top_left[1] + h)
 
-	return top_left, bottom_right
+	return top_left, bottom_right, max_val
 
 
 class TrackedObject:
@@ -90,9 +92,9 @@ class TrackedObject:
 		@return:    A Tuple of coordinates of a rectangle to search for the object.
 		"""
 		if self.middle:
-			return search_margin(self.middle, 100)
+			return search_margin(self.middle, 150)
 		else:
-			return search_margin(get_middle(*self.loc), 100)
+			return search_margin(get_middle(*self.loc), 150)
 
 
 class Tracker:
@@ -120,7 +122,7 @@ class Tracker:
 		self.new_points = self.old_points = None
 
 		# ------------------------ Capture ------------------------
-		self.cap = FileVideoStream(video_file, queue_size=512).start()
+		self.cap = FileVideoStream(video_file, queue_size=256).start()
 
 		# Get number of frames:
 		video = cv2.VideoCapture(video_file)
@@ -132,7 +134,7 @@ class Tracker:
 
 	def track_camera(self, window_pct=((0, 0.45), (0.38, 0.55))):
 		lk_params = dict(
-			winSize=(30, 30),
+			winSize=(100, 100),
 			maxLevel=2,
 			criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
 		)
@@ -140,7 +142,7 @@ class Tracker:
 		maxCorners = 35
 		feature_params = dict(
 			maxCorners=maxCorners,
-			qualityLevel=0.1,
+			qualityLevel=0.05,
 			minDistance=10,
 			blockSize=7
 		)
@@ -193,7 +195,7 @@ class Tracker:
 		on the frame for debugging purposes.
 		@param obj:     TrackedObject object (e.g. Reticle / Camera)
 		"""
-		top_left, bottom_right = matchSymbol(img=self.frame_grey,
+		top_left, bottom_right, _ = matchSymbol(img=self.frame_grey,
 		                                     template=obj.img,
 		                                     search_area=obj.search_area
 		                                     )

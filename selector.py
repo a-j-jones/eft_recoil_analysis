@@ -23,6 +23,7 @@ class Selector:
 		# Initial Frame:
 		_, self.base_frame = self.cap.read()
 
+
 	def close(self):
 		"""
 		Releases the connection to the video file and closes all cv2 windows.
@@ -64,11 +65,11 @@ class Selector:
 			cv2.imshow("Frame", frame)
 
 			if not self.drawing:
-				cv2.rectangle(self.base_frame, self.point1, self.point2, (0, 0, 255))
+				cv2.rectangle(frame, self.point1, self.point2, (0, 0, 255))
 				break
 
 			key = cv2.waitKey(1)
 			if key == 27:
 				break
 
-		return (self.point1, self.point2), frame[self.point1[1]:self.point2[1], self.point1[0]:self.point2[0]]
+		return (self.point1, self.point2), self.base_frame[self.point1[1]:self.point2[1], self.point1[0]:self.point2[0]]
