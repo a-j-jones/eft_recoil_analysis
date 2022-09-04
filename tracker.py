@@ -7,6 +7,8 @@ import json
 import numpy as np
 from tqdm import tqdm
 from imutils.video import FileVideoStream
+from imutils import resize
+import glob
 
 # Typing:
 from typing import Tuple, Optional
@@ -68,16 +70,30 @@ def matchSymbol(img: ndarray, template: ndarray,
 
 
 class TrackedObject:
-	def __init__(self, selector: Selector, name: str):
+	def __init__(self,
+	             name: str,
+	             selector: Selector = None,
+	             loc: Tuple[Tuple[int, int], Tuple[int, int]] = None,
+	             img: ndarray = None):
 		"""
 		Initialises TrackedObject which contains the information required for tracking a specific object.
-		@param selector:    Selector object which defines the initial img and location of the object.
 		@param name:        Name of the tracked object.
+		@param selector:    Selector object which defines the initial img and location of the object.
+		@param loc:         Location of the object to be tracked.
+		@param img:         Image to be tracked.
 		"""
 		self.__search_area = None
 		self.name = name
 		self.middle = None
-		self.loc, self.img = selector.get_rectangle()
+
+		if selector:
+			self.loc, self.img = selector.get_rectangle()
+		elif loc is None or img is None:
+			raise ValueError("If Selector object is not provided then Location and Image template must be instead.")
+		else:
+			self.loc = loc
+			self.img = img
+
 		self.img = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
 
 	@property
@@ -114,23 +130,71 @@ class Tracker:
 		self.frame_grey = self.frame = self.prev_frame = self.orig_frame = None
 		self.video_file = video_file
 
+		# Get number of frames and initial frame:
+		video = cv2.VideoCapture(video_file)
+		self.length = video.get(cv2.CAP_PROP_FRAME_COUNT)
+		_, self.initial_frame = video.read()
+		video.release()
+
 		# -------------------- Tracking points --------------------
-		self.selector = Selector(video_file)
-		self.reticle = TrackedObject(self.selector, name="Reticle")
-		self.selector.close()
+		self.reticle = self.get_reticle()
 		self.original_points = None
 		self.new_points = self.old_points = None
 
 		# ------------------------ Capture ------------------------
 		self.cap = FileVideoStream(video_file, queue_size=256).start()
 
-		# Get number of frames:
-		video = cv2.VideoCapture(video_file)
-		self.length = video.get(cv2.CAP_PROP_FRAME_COUNT)
-		video.release()
-
 		# ----------------------- Debugging -----------------------
 		self.debug_level = debug_level
+
+	def get_reticle(self, window_pct=((0.25, 0.40), (0.75, 0.60))):
+		"""
+		Loops through the saved reticle templates to see if we can identify a reticle in the screen, if one
+		cannot be found then the code reverts to the manual selection tool to find the appropriate reticle on
+		the screen.
+
+		@param window_pct:  Window size to limit the area of the screen that is searched by cv2.MatchTemplate for
+							performance.
+		"""
+
+		# Gets the grey frame and the window dimensions:
+		grey_frame = cv2.cvtColor(self.initial_frame, cv2.COLOR_BGR2GRAY)
+		x1 = int(grey_frame.shape[1] * window_pct[0][1])
+		x2 = int(grey_frame.shape[1] * window_pct[1][1])
+		y1 = int(grey_frame.shape[0] * window_pct[0][0])
+		y2 = int(grey_frame.shape[0] * window_pct[1][0])
+
+		# Loop through each file in the templates folder:
+		for file in glob.glob("templates/*.jpg"):
+			template = cv2.imread(file)
+			template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+
+			match_data = {scale: None for scale in np.linspace(0.9, 1.1, 5)}
+			for scale in match_data.keys():
+				resized_template = resize(template, width=int(template.shape[1] * scale))
+				top_left, bottom_right, match = matchSymbol(img=grey_frame,
+				                                            template=resized_template,
+				                                            search_area=((x1, y1), (x2, y2)))
+				match_data[scale] = {
+					"match": match,
+					"loc": (top_left, bottom_right)
+				}
+
+			match_value = np.array([m["match"] for k, m in match_data.items()])
+			match_scales = list(match_data.keys())
+
+			best_match = match_scales[np.argmax(match_value)]
+			data = match_data[best_match]
+			if data["match"] > 0.80:
+				img = self.initial_frame[data["loc"][0][1]:data["loc"][1][1], data["loc"][0][0]:data["loc"][1][0]]
+				return TrackedObject(name="Reticle", loc=(data["loc"][0], data["loc"][1]), img=img)
+
+		# If no match found, revert to manual selection and return object.
+		selector = Selector(self.video_file)
+		t = TrackedObject(name="Reticle", selector=selector)
+		selector.close()
+
+		return t
 
 	def track_camera(self, window_pct=((0, 0.45), (0.38, 0.55))):
 		lk_params = dict(
