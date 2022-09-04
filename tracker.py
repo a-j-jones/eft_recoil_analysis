@@ -108,13 +108,13 @@ class TrackedObject:
 		@return:    A Tuple of coordinates of a rectangle to search for the object.
 		"""
 		if self.middle:
-			return search_margin(self.middle, 150)
+			return search_margin(self.middle, 75)
 		else:
-			return search_margin(get_middle(*self.loc), 150)
+			return search_margin(get_middle(*self.loc), 75)
 
 
 class Tracker:
-	def __init__(self, video_file: str, debug_level: int = 0):
+	def __init__(self, video_file: str, debug_level: int = 0, find_new_points: int = 0):
 		"""
 		Initialises Tracker class which will track objects in a 2D space using cv2. The class records coordinates
 		data for the position of tracked objects which can be used to calculate the recoil of a weapon in EFT.
@@ -140,6 +140,7 @@ class Tracker:
 		self.reticle = self.get_reticle()
 		self.original_points = None
 		self.new_points = self.old_points = None
+		self.find_new_points = find_new_points
 
 		# ------------------------ Capture ------------------------
 		self.cap = FileVideoStream(video_file, queue_size=256).start()
@@ -196,19 +197,19 @@ class Tracker:
 
 		return t
 
-	def track_camera(self, window_pct=((0, 0.45), (0.38, 0.55))):
+	def track_camera(self, window_pct=((0, 0.45), (0.36, 0.55))):
 		lk_params = dict(
-			winSize=(100, 100),
-			maxLevel=2,
+			winSize=(150, 150),
+			maxLevel=3,
 			criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
 		)
 
-		maxCorners = 35
+		maxCorners = 50
 		feature_params = dict(
 			maxCorners=maxCorners,
-			qualityLevel=0.05,
+			qualityLevel=0.1,
 			minDistance=10,
-			blockSize=7
+			blockSize=3
 		)
 
 		x1 = int(self.frame_grey.shape[1] * window_pct[0][1])
@@ -219,7 +220,7 @@ class Tracker:
 		curr_frame = self.frame_grey[y1:y2, x1:x2]
 		prev_frame = self.prev_frame[y1:y2, x1:x2]
 
-		if self.new_points is None or len(self.new_points) < (maxCorners * 0.75):
+		if self.new_points is None or len(self.new_points) < (maxCorners * 0.75) or self.find_new_points:
 			self.old_points = cv2.goodFeaturesToTrack(prev_frame,
 			                                     **feature_params)
 		else:
@@ -264,19 +265,21 @@ class Tracker:
 		                                     search_area=obj.search_area
 		                                     )
 
-		# Draw rectangle over tracked object and the search area:
-		cv2.rectangle(self.frame, top_left, bottom_right, (255, 255, 255), 1)
-		cv2.rectangle(self.frame, obj.search_area[0], obj.search_area[1], (255, 255, 255), 1)
+		if self.debug_level > 0:
+			# Draw rectangle over tracked object and the search area:
+			cv2.rectangle(self.frame, top_left, bottom_right, (255, 255, 255), 1)
+			cv2.rectangle(self.frame, obj.search_area[0], obj.search_area[1], (255, 255, 255), 1)
 
-		# Add text to the search areas for information:
-		cv2.putText(self.frame, obj.name, (top_left[0], top_left[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
-		            (255, 255, 255),
-		            1)
-		cv2.putText(self.frame, f"{obj.name} search area", (obj.search_area[0][0], obj.search_area[0][1] - 5),
-		            cv2.FONT_HERSHEY_SIMPLEX,
-		            0.4,
-		            (255, 255, 255),
-		            1)
+			# Add text to the search areas for information:
+			cv2.putText(self.frame, obj.name, (top_left[0], top_left[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+			            (255, 255, 255),
+			            1)
+			cv2.putText(self.frame, f"{obj.name} search area", (obj.search_area[0][0], obj.search_area[0][1] - 5),
+			            cv2.FONT_HERSHEY_SIMPLEX,
+			            0.4,
+			            (255, 255, 255),
+			            1)
+
 		obj.middle = get_middle(top_left, bottom_right)
 
 	def track(self):
@@ -294,8 +297,9 @@ class Tracker:
 				if self.frame is None:
 					break
 
-				cv2.putText(self.frame, "Queue Size: {}".format(self.cap.Q.qsize()),
-				            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+				if self.debug_level > 0:
+					cv2.putText(self.frame, "Queue Size: {}".format(self.cap.Q.qsize()),
+					            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
 				# Convert frame to Grayscale
 				self.frame_grey = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
@@ -322,6 +326,7 @@ class Tracker:
 
 				# Show frame:
 				if self.debug_level > 0:
+					self.draw_recoil()
 					cv2.imshow("Frame", self.frame)
 					cv2.waitKey(15)
 
@@ -330,6 +335,55 @@ class Tracker:
 			pbar.close()
 			self.cap.stop()
 			cv2.destroyAllWindows()
+
+	def draw_recoil(self, rel_start_x=0.4, rel_start_y=0.5):
+		start_x = rel_start_x * self.frame.shape[1]
+		start_y = rel_start_y * self.frame.shape[0]
+
+		arrs = {
+			"reticle_x": np.array([x["reticle"][0] for x in self.data]),
+			"reticle_y": np.array([x["reticle"][1] for x in self.data]),
+			"camera_x": np.array([x["optical_flow"][0] for x in self.data]),
+			"camera_y": np.array([x["optical_flow"][1] for x in self.data])
+		}
+
+		# Shifts:
+		shift_by = 1
+		shift_nan = np.empty(shift_by)
+		shift_nan[:] = np.nan
+
+		for axis in ["x", "y"]:
+			# Reticle processing:
+			base_arr = arrs[f"reticle_{axis}"]
+			shift_arr = np.append(shift_nan, base_arr[:-shift_by])
+			abs_move_arr = base_arr - shift_arr
+			arrs[f"reticle_{axis}"] = np.append(np.zeros(1), np.cumsum(abs_move_arr[1:]))
+
+			# Camera processing:
+			base_arr = arrs[f"camera_{axis}"]
+			arrs[f"camera_{axis}"] = np.append(np.zeros(1), np.cumsum(base_arr[1:]))
+
+			# Combined:
+			arrs[f"combined_{axis}"] = arrs[f"reticle_{axis}"] + arrs[f"camera_{axis}"]
+
+		x_arr = arrs[f"combined_x"]
+		y_arr = arrs[f"combined_y"] * -1
+
+		for i in range(len(y_arr)):
+			if i == 0:
+				continue
+
+			cv2.line(self.frame,
+			         (int(x_arr[i] + start_x), int(y_arr[i] + start_y)),
+			         (int(x_arr[i-1] + start_x), int(y_arr[i-1] + start_y)),
+			         (0, 255, 0), thickness=4, lineType=8)
+
+			cv2.putText(self.frame, "Recoil", (int(start_x - 20), int(start_y + 25)),
+			            cv2.FONT_HERSHEY_SIMPLEX,
+			            0.4,
+			            (255, 255, 255),
+			            1)
+
 
 	def save(self, filename: Optional[str] = None):
 		"""
