@@ -197,7 +197,16 @@ class Tracker:
 
 		return t
 
-	def track_camera(self, window_pct=((0, 0.45), (0.36, 0.55))):
+	def track_camera(self,
+					 window_pct: Tuple[Tuple[float, float],Tuple[float, float]] = ((0, 0.45), (0.36, 0.55))):
+		"""
+		Tracks the camera position using cv2.goodFeaturesToTrack and cv2.calcOpticalFlowPyrLK, this contributes
+		to the overall recoil of the weapon.
+
+		@param window_pct: 	Tuple of screen size relative points (percentage of the screen width/height)
+							e.g. (y1, x1), (y2, x2)
+		@return:
+		"""
 		lk_params = dict(
 			winSize=(150, 150),
 			maxLevel=3,
@@ -337,6 +346,12 @@ class Tracker:
 			cv2.destroyAllWindows()
 
 	def draw_recoil(self, rel_start_x=0.4, rel_start_y=0.5):
+		"""
+		Draws the recoil pattern on the frame in real time as a debugging tool:
+
+		@param rel_start_x: Relative start x position of the recoil (percentage of screen)
+		@param rel_start_y: Relative start y position of the recoil (percentage of screen)
+		"""
 		start_x = rel_start_x * self.frame.shape[1]
 		start_y = rel_start_y * self.frame.shape[0]
 

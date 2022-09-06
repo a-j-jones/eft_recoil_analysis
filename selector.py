@@ -53,6 +53,7 @@ class Selector:
 		"""
 		Loops until a rectangle has been drawn around an object to be tracked.
 		@return:    Tuple of coordinates of a rectangle and corresponding cv2 image as a tracking template.
+					Image from the base frame (not the template that was matched).
 		"""
 		self.drawing = True
 		self.point1 = ()
