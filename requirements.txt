@@ -2,3 +2,4 @@ tqdm
 imutils
 numpy
 opencv-python
+gradio
