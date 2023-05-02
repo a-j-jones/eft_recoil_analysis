@@ -11,7 +11,7 @@ from numpy import ndarray
 from tqdm import tqdm
 
 # Private packages:
-from selector import Selector
+from utils.selector import Selector
 
 
 def search_margin(middle: Tuple[int, int], margin_px: int = 100) -> Tuple[Tuple[int, int], Tuple[int, int]]:
@@ -251,7 +251,6 @@ class Tracker:
         self.new_points = self.new_points[idx]
         self.old_points = self.old_points[idx]
 
-        # ----------------------------- START DEBUGGING -----------------------------
         if self.debug_level == 1:
             cv2.rectangle(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
             for new, old in zip(self.new_points, self.old_points):
@@ -259,7 +258,6 @@ class Tracker:
                          (int(new[0] + x1), int(new[1] + y1)),
                          (int(old[0] + x1), int(old[1] + y1)),
                          (0, 255, 0), thickness=4, lineType=8)
-        # ------------------------------ END DEBUGGING ------------------------------
 
         movement = self.new_points - self.old_points
 
@@ -318,6 +316,10 @@ class Tracker:
 
                 # Convert frame to Grayscale
                 self.frame_grey = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
+
+                # After converting the frame to grayscale, apply histogram equalization
+                self.frame_grey = cv2.equalizeHist(self.frame_grey)
+
                 self.frame_id += 1
 
                 # Track camera:
