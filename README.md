@@ -19,19 +19,30 @@ For best results in EFT:
     - Use a sharp red dot, I haven't tested many, but the holographics & dovetail OKP-7 seem to work well.
     - Offline Factory works well as there are some longer distances which means the sparks from bullet impacts have a lesser effect on the tracking, though with some tweaking you may find that the shooting range can provide similar results.
 
-## Example
+
+## Gradio Interface
+
+The tool can be run using the gradio interface by running the following in your terminal:
+```cmd
+python app.py
+```
+
+You can drag multiple mp4 files into the interface and click submit. The tool will process the results one by one and
+display the results in the output window.
+
+## Python example
 
 * Create a file `main.py` with:
 
 ```Python
-from tracker import Tracker
+from utils.tracker import Tracker
 
 # Add your in / out filenames
 video_filename = "recoil.mp4"
 output_filename = "recoil.json"
 
 # Track video file:
-t = Tracker(video_filename, debug_level=1) # Debug level == 1 shows the tracking in real time.
+t = Tracker(video_filename, debug_level=1)  # Debug level == 1 shows the tracking in real time.
 t.track()
 t.save(output_filename)
 

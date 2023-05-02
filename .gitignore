@@ -1,3 +1,5 @@
 /venv/
 /videos/
-/recoil data/
+
+# Exlude results but allow the directory structure:
+/results/*.json
