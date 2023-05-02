@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from PIL import ImageFile
 
-from tracker import Tracker
+from utils.tracker import Tracker
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -23,6 +23,7 @@ def get_recoil_pattern(file: str) -> pd.DataFrame:
 
     df = pd.read_json(file).set_index("frame")
 
+    df["filename"] = Path(file).stem
     df[["reticle_x", "reticle_y"]] = pd.DataFrame(df.reticle.tolist(), index=df.index)
     df[["camera_x", "camera_y"]] = pd.DataFrame(df["optical_flow"].tolist(), index=df.index)
     for col in ["camera_x", "camera_y"]:
@@ -42,11 +43,12 @@ def get_recoil_pattern(file: str) -> pd.DataFrame:
     df["combined_y"] = df.reticle_y + df.camera_y
     df["combined_y_move"] = df.combined_y - df.combined_y.shift(1)
     df["combined_y_color"] = df.combined_y_move.apply(lambda x: "red" if x > 0 else "blue")
+    df = df[["filename", "combined_x", "combined_y", "combined_y_color"]]
 
     return df
 
 
-def create_plots(file: str) -> np.ndarray:
+def create_plots(files: List[str]) -> np.ndarray:
     """
     Create the plots for the recoil pattern and movement.
 
@@ -55,21 +57,39 @@ def create_plots(file: str) -> np.ndarray:
     """
 
     plots = 1
-    width = 6
-    fig, axs = plt.subplots(2, plots, figsize=(width, 10), sharey='row')
+    width = len(files) * 3
+    fig, axs = plt.subplots(figsize=(width, 8))
 
-    df = get_recoil_pattern(file)
+    df = pd.concat([get_recoil_pattern(file) for file in files])
+
+    offset = 0
+    labels = []
+    for file in df.filename.unique():
+        # Create labels for plot:
+        label = {
+            "x": offset,
+            "y": df[df.filename == file].combined_y.max() + 25,
+            "s": file.replace("_", "\n"),
+            "horizontalalignment": "center"
+        }
+        labels.append(label)
+
+        # Create offset for the next scatter:
+        additional_offset = df[df.filename == file].combined_x.max() + 100
+        df.loc[df.filename == file, "combined_x"] = df[df.filename == file].combined_x + offset
+        offset += additional_offset
+
+    # Plot labels:
+    for label in labels:
+        axs.text(**label)
 
     # Spray pattern plotted:
-    axs[0].scatter(df.combined_x, df.combined_y, c=df.combined_y_color)
-    axs[0].set_title(f"Combined reticle and camera recoil")
-    axs[0].axis('equal')
+    axs.scatter(df.combined_x, df.combined_y, c=df.combined_y_color)
+    axs.set_title(f"Combined reticle and camera recoil")
+    axs.axis('equal')
+    axs.set_ylim(df.combined_y.min() - 25, df.combined_y.max() + 75)
 
-    # Movement plotted:
-    axs[1].plot(df.index, df.combined_y_move)
-    axs[1].set_title(f"Combined reticle and camera recoil")
-
-    fig.tight_layout()
+    # fig.tight_layout()
 
     with io.BytesIO() as buff:
         fig.savefig(buff, format='raw')
@@ -81,7 +101,7 @@ def create_plots(file: str) -> np.ndarray:
     return im
 
 
-def create_tracker(file: str, files: list) -> List[np.ndarray]:
+def create_tracker(files: list) -> List[np.ndarray]:
     """
     Create the tracker for the recoil pattern.
 
@@ -93,26 +113,30 @@ def create_tracker(file: str, files: list) -> List[np.ndarray]:
         files = []
 
     images = []
-    for filepath in [file, *[x.name for x in files]]:
+    results = []
+    for file in files:
+        filepath = file.name
         if filepath is None:
             continue
 
         print(filepath)
-        filename = Path(filepath).stem
+        filename = Path(filepath).stem[:-8]
         output = Path("results", filename).with_suffix(".json")
         t = Tracker(filepath)
         t.track()
         t.save(output)
-        img = create_plots(output)
-        images.append(img)
+        results.append(output)
 
-    return images
+    image = create_plots(results)
+
+    return image
 
 
-interface = gr.Interface(
-    fn=create_tracker,
-    inputs=[gr.Video(), gr.File(file_count="multiple")],
-    outputs=[gr.Gallery()]
-)
+if __name__ == "__main__":
+    interface = gr.Interface(
+        fn=create_tracker,
+        inputs=gr.File(file_count="multiple"),
+        outputs=gr.Image()
+    )
 
-interface.launch(debug=True)
+    interface.launch(debug=True)
