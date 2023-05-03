@@ -1,6 +1,7 @@
 # Public packages:
 import glob
 import json
+from pathlib import Path
 from typing import Tuple, Optional
 
 import cv2
@@ -39,9 +40,9 @@ def get_middle(point1: Tuple[int, int], point2: Tuple[int, int]) -> Tuple[int, i
     return int(round((point2_x - point1_x) / 2) + point1_x), int(round((point2_y - point1_y) / 2) + point1_y)
 
 
-def matchSymbol(img: ndarray, template: ndarray,
-                search_area: Tuple[Tuple[int, int], Tuple[int, int]] = None) -> Tuple[
-    Tuple[int, int], Tuple[int, int], int]:
+def match_symbol(img: ndarray, template: ndarray,
+                 search_area: Tuple[Tuple[int, int], Tuple[int, int]] = None
+                 ) -> Tuple[Tuple[int, int], Tuple[int, int], int]:
     """
     Match a template image within a larger image using cv2.matchTemplate, returns the Top-Left
     and Bottom-Right coordinates of the template image at the matched location.
@@ -161,7 +162,9 @@ class Tracker:
         # ----------------------- Debugging -----------------------
         self.debug_level = debug_level
 
-    def get_reticle(self, window_pct=((0.25, 0.40), (0.75, 0.60))) -> TrackedObject:
+    def get_reticle(self,
+                    window_pct: Tuple[Tuple[float, float], Tuple[float, float]] = ((0.25, 0.40), (0.75, 0.60))
+                    ) -> TrackedObject:
         """
         Loops through the saved reticle templates to see if we can identify a reticle in the screen, if one
         cannot be found then the code reverts to the manual selection tool to find the appropriate reticle on
@@ -187,9 +190,9 @@ class Tracker:
             for scale in match_data.keys():
                 resized_template = resize(template, width=int(template.shape[1] * scale))
 
-                top_left, bottom_right, match = matchSymbol(img=grey_frame,
-                                                            template=resized_template,
-                                                            search_area=((x1, y1), (x2, y2)))
+                top_left, bottom_right, match = match_symbol(img=grey_frame,
+                                                             template=resized_template,
+                                                             search_area=((x1, y1), (x2, y2)))
                 match_data[scale] = {
                     "match": match,
                     "loc": (top_left, bottom_right)
@@ -253,10 +256,10 @@ class Tracker:
         on the frame for debugging purposes.
         @param obj:     TrackedObject object (e.g. Reticle / Camera)
         """
-        top_left, bottom_right, _ = matchSymbol(img=self.frame_grey,
-                                                template=obj.img,
-                                                search_area=obj.search_area
-                                                )
+        top_left, bottom_right, _ = match_symbol(img=self.frame_grey,
+                                                 template=obj.img,
+                                                 search_area=obj.search_area
+                                                 )
 
         if self.debug_level > 0:
             # Draw rectangle over tracked object and the search area:
@@ -279,10 +282,6 @@ class Tracker:
         """
         Loops through every frame in the video file and tracks each object which has been selected by the user.
         """
-        # if self.debug_level:
-        # 	cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
-        # 	cv2.moveWindow("Frame", 40, 30)
-
         with tqdm(total=self.length) as pbar:
             while self.cap.more():
                 # Get new frame from the video:
@@ -383,7 +382,7 @@ class Tracker:
                         (255, 255, 255),
                         1)
 
-    def save(self, filename: Optional[str] = None) -> None:
+    def save(self, filename: Optional[Path | str] = None) -> None:
         """
         Saves the positional data to a given JSON file.
         @param filename:    JSON file path (e.g. position_data.json)
