@@ -101,11 +101,11 @@ def create_plots(files: List[str]) -> np.ndarray:
     return im
 
 
-def create_tracker(files: list) -> List[np.ndarray]:
+def create_tracker(high_precision: bool, files: list) -> List[np.ndarray]:
     """
     Create the tracker for the recoil pattern.
 
-    @param file:  Video file to track.
+    @param high_precision: Whether to use high precision tracking.
     @param files: List of additional files to track.
     @return:
     """
@@ -122,7 +122,7 @@ def create_tracker(files: list) -> List[np.ndarray]:
         print(filepath)
         filename = Path(filepath).stem[:-8]
         output = Path("results", filename).with_suffix(".json")
-        t = Tracker(filepath)
+        t = Tracker(filepath, high_precision=high_precision)
         t.track()
         t.save(output)
         results.append(output)
@@ -135,7 +135,7 @@ def create_tracker(files: list) -> List[np.ndarray]:
 if __name__ == "__main__":
     interface = gr.Interface(
         fn=create_tracker,
-        inputs=gr.File(file_count="multiple"),
+        inputs=[gr.Checkbox(value=False, label="High Precision"), gr.File(file_count="multiple")],
         outputs=gr.Image()
     )
 
