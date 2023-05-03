@@ -1,25 +1,56 @@
+from typing import Tuple
+
 import cv2
 import numpy as np
 
+from utils.tracker import Tracker
 
-def lucas_kanade(tracker, prev_frame, curr_frame, x1, y1, x2, y2):
-    lk_params = dict(
-        winSize=(150, 150),
-        maxLevel=3,
-        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
-    )
+# Parameters for lucas kanade optical flow:
+LK_PARAMS = dict(
+    winSize=(150, 150),
+    maxLevel=3,
+    criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
+)
+MAX_CORNERS = 50
+FEATURE_PARAMS = dict(
+    maxCorners=MAX_CORNERS,
+    qualityLevel=0.1,
+    minDistance=10,
+    blockSize=3
+)
 
-    maxCorners = 50
-    feature_params = dict(
-        maxCorners=maxCorners,
-        qualityLevel=0.1,
-        minDistance=10,
-        blockSize=3
-    )
+# Parameters for farneback optical flow:
+FB_PARAMS = dict(
+    pyr_scale=0.1,
+    levels=3,
+    winsize=100,
+    iterations=4,
+    poly_n=9,
+    poly_sigma=1.2,
+    flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN
+)
 
-    if tracker.new_points is None or len(tracker.new_points) < (maxCorners * 0.75) or tracker.find_new_points:
+
+def lucas_kanade(tracker: Tracker,
+                 prev_frame: np.ndarray,
+                 curr_frame: np.ndarray,
+                 x1: float,
+                 y1: float
+                 ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate the movement of the frame using the Lucas-Kanade method.
+
+    @param tracker: Tracker object
+    @param prev_frame: Previous video frame
+    @param curr_frame: Current video frame
+    @param x1: Top-left x coordinate of the portion of frame to track
+    @param y1: Top-left y coordinate of the portion of frame to track
+    @return:
+    """
+
+    if tracker.new_points is None or len(tracker.new_points) < (MAX_CORNERS * 0.75) or tracker.find_new_points:
         tracker.old_points = cv2.goodFeaturesToTrack(prev_frame,
-                                                     **feature_params)
+                                                     **FEATURE_PARAMS)
     else:
         tracker.old_points = tracker.new_points.reshape(len(tracker.new_points), 1, 2)
 
@@ -27,7 +58,7 @@ def lucas_kanade(tracker, prev_frame, curr_frame, x1, y1, x2, y2):
                                                                  curr_frame,
                                                                  tracker.old_points,
                                                                  None,
-                                                                 **lk_params)
+                                                                 **LK_PARAMS)
 
     idx = np.where(status == 1)
     tracker.new_points = tracker.new_points[idx]
@@ -44,19 +75,23 @@ def lucas_kanade(tracker, prev_frame, curr_frame, x1, y1, x2, y2):
     return movement, lines
 
 
-def farneback(prev_frame, curr_frame, x1, y1, x2, y2):
-    fb_params = dict(
-        pyr_scale=0.1,
-        levels=3,
-        winsize=100,
-        iterations=4,
-        poly_n=9,
-        poly_sigma=1.2,
-        flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN
-    )
+def farneback(prev_frame: np.ndarray,
+              curr_frame: np.ndarray,
+              x1: float,
+              y1: float
+              ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate the movement of the frame using the Farneback method.
+
+    @param prev_frame: Previous video frame
+    @param curr_frame: Current video frame
+    @param x1: Top-left x coordinate of the portion of frame to track
+    @param y1: Top-left y coordinate of the portion of frame to track
+    @return:
+    """
 
     # Calculate the movement:
-    flow = cv2.calcOpticalFlowFarneback(prev_frame, curr_frame, None, **fb_params)
+    flow = cv2.calcOpticalFlowFarneback(prev_frame, curr_frame, None, **FB_PARAMS)
     flow_magnitude = np.linalg.norm(flow, axis=2)
     threshold = 0.20  # Adjust this value based on your requirements
     mask = flow_magnitude > threshold

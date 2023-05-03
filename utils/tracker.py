@@ -238,9 +238,9 @@ class Tracker:
         prev_frame = self.prev_frame[y1:y2, x1:x2]
 
         if high_precision:
-            movement, lines = farneback(prev_frame, curr_frame, x1, y1, x2, y2)
+            movement, lines = farneback(prev_frame, curr_frame, x1, y1)
         else:
-            movement, lines = lucas_kanade(self, prev_frame, curr_frame, x1, y1, x2, y2)
+            movement, lines = lucas_kanade(self, prev_frame, curr_frame, x1, y1)
 
         if self.debug_level > 0:
             # Draw lines on the frame:
