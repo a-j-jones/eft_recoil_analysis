@@ -11,6 +11,7 @@ from numpy import ndarray
 from tqdm import tqdm
 
 # Private packages:
+from utils.optical_flow import farneback, lucas_kanade
 from utils.selector import Selector
 
 
@@ -118,7 +119,11 @@ class TrackedObject:
 
 
 class Tracker:
-    def __init__(self, video_file: str, debug_level: int = 0, find_new_points: int = 0) -> None:
+    def __init__(self,
+                 video_file: str,
+                 debug_level: int = 0,
+                 find_new_points: int = 0,
+                 high_precision: bool = False) -> None:
         """
         Initialises Tracker class which will track objects in a 2D space using cv2. The class records coordinates
         data for the position of tracked objects which can be used to calculate the recoil of a weapon in EFT.
@@ -127,6 +132,8 @@ class Tracker:
 
         @param video_file:  File path for the video file to be analysed.
         @param debug_level: Integer value to define level of debugging.
+        @param find_new_points: Integer value to define how often to find new points for tracking.
+        @param high_precision: Boolean value to define whether to use high precision tracking.
         """
         # ----------------- Initialise frame data -----------------
         self.data = []
@@ -145,6 +152,8 @@ class Tracker:
         self.original_points = None
         self.new_points = self.old_points = None
         self.find_new_points = find_new_points
+        self.tracker_initialized = False
+        self.high_precision = high_precision
 
         # ------------------------ Capture ------------------------
         self.cap = FileVideoStream(video_file, queue_size=256).start()
@@ -204,28 +213,18 @@ class Tracker:
         return t
 
     def track_camera(self,
-                     window_pct: Tuple[Tuple[float, float], Tuple[float, float]] = ((0, 0.45), (0.36, 0.55))) -> None:
+                     window_pct: Tuple[Tuple[float, float], Tuple[float, float]] = ((0.05, 0.45), (0.36, 0.55)),
+                     high_precision=False
+                     ) -> Tuple[float, float]:
         """
-        Tracks the camera position using cv2.goodFeaturesToTrack and cv2.calcOpticalFlowPyrLK, this contributes
+        Tracks the camera position using cv2.calcOpticalFlowFarneback, this contributes
         to the overall recoil of the weapon.
 
-        @param window_pct: 	Tuple of screen size relative points (percentage of the screen width/height)
+        @param window_pct:  Tuple of screen size relative points (percentage of the screen width/height)
                             e.g. (y1, x1), (y2, x2)
+        @param high_precision:  Boolean value to determine whether to use the high precision method of tracking.
         @return:
         """
-        lk_params = dict(
-            winSize=(150, 150),
-            maxLevel=3,
-            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
-        )
-
-        maxCorners = 50
-        feature_params = dict(
-            maxCorners=maxCorners,
-            qualityLevel=0.1,
-            minDistance=10,
-            blockSize=3
-        )
 
         x1 = int(self.frame_grey.shape[1] * window_pct[0][1])
         x2 = int(self.frame_grey.shape[1] * window_pct[1][1])
@@ -235,37 +234,18 @@ class Tracker:
         curr_frame = self.frame_grey[y1:y2, x1:x2]
         prev_frame = self.prev_frame[y1:y2, x1:x2]
 
-        if self.new_points is None or len(self.new_points) < (maxCorners * 0.75) or self.find_new_points:
-            self.old_points = cv2.goodFeaturesToTrack(prev_frame,
-                                                      **feature_params)
+        if high_precision:
+            movement, lines = farneback(prev_frame, curr_frame, x1, y1, x2, y2)
         else:
-            self.old_points = self.new_points.reshape(len(self.new_points), 1, 2)
+            movement, lines = lucas_kanade(self, prev_frame, curr_frame, x1, y1, x2, y2)
 
-        self.new_points, status, error = cv2.calcOpticalFlowPyrLK(prev_frame,
-                                                                  curr_frame,
-                                                                  self.old_points,
-                                                                  None,
-                                                                  **lk_params)
+        if self.debug_level > 0:
+            # Draw lines on the frame:
+            for line in lines:
+                x1, y1, x2, y2 = line
+                cv2.line(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
 
-        idx = np.where(status == 1)
-        self.new_points = self.new_points[idx]
-        self.old_points = self.old_points[idx]
-
-        if self.debug_level == 1:
-            cv2.rectangle(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
-            for new, old in zip(self.new_points, self.old_points):
-                cv2.line(self.frame,
-                         (int(new[0] + x1), int(new[1] + y1)),
-                         (int(old[0] + x1), int(old[1] + y1)),
-                         (0, 255, 0), thickness=4, lineType=8)
-
-        movement = self.new_points - self.old_points
-
-        # Median:
-        x_average = np.median(movement[:, 0])
-        y_average = np.median(movement[:, 1])
-
-        return float(x_average), float(y_average)
+        return float(movement[0]), float(movement[1])
 
     def track_object(self, obj: TrackedObject) -> None:
         """
@@ -317,14 +297,11 @@ class Tracker:
                 # Convert frame to Grayscale
                 self.frame_grey = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
 
-                # After converting the frame to grayscale, apply histogram equalization
-                self.frame_grey = cv2.equalizeHist(self.frame_grey)
-
                 self.frame_id += 1
 
                 # Track camera:
                 if self.frame_id > 1:
-                    camera_shake = self.track_camera()
+                    camera_shake = self.track_camera(high_precision=self.high_precision)
                 else:
                     self.orig_frame = self.frame_grey
                     camera_shake = (0, 0)
