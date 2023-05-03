@@ -206,7 +206,7 @@ class Tracker:
                 return TrackedObject(name="Reticle", loc=(data["loc"][0], data["loc"][1]), img=img)
 
         # If no match found, revert to manual selection and return object.
-        selector = Selector(self.video_file, best_match=(data["loc"][0], data["loc"][1]))
+        selector = Selector(self.video_file)
         t = TrackedObject(name="Reticle", selector=selector)
         selector.close()
 
