@@ -89,8 +89,6 @@ def create_plots(files: List[str | Path]) -> np.ndarray:
     axs.axis('equal')
     axs.set_ylim(df.combined_y.min() - 25, df.combined_y.max() + 75)
 
-    # fig.tight_layout()
-
     with io.BytesIO() as buff:
         fig.savefig(buff, format='raw')
         buff.seek(0)
@@ -101,14 +99,19 @@ def create_plots(files: List[str | Path]) -> np.ndarray:
     return im
 
 
-def create_tracker(high_precision: bool, files: list) -> np.ndarray:
+def create_tracker(checkboxes: List[str], files: list) -> np.ndarray:
     """
     Create the tracker for the recoil pattern.
 
-    @param high_precision: Whether to use high precision tracking.
+    @param checkboxes: List of checkbox names which are checked.
     @param files: List of additional files to track.
     @return:
     """
+
+    # Get the options from the checkboxes:
+    high_precision = True if "High precision tracking" in checkboxes else False
+    debug_level = 1 if "Debug mode" in checkboxes else 0
+
     if files is None:
         files = []
 
@@ -120,12 +123,16 @@ def create_tracker(high_precision: bool, files: list) -> np.ndarray:
             continue
 
         print(filepath)
-        filename = Path(filepath).stem[:-8]
-        output = Path("results", filename).with_suffix(".json")
-        t = Tracker(filepath, high_precision=high_precision)
+        video_file = Path(filepath).stem[:-8]
+        results_file = Path("results", video_file).with_suffix(".json")
+        t = Tracker(
+            filepath,
+            high_precision=high_precision,
+            debug_level=debug_level
+        )
         t.track()
-        t.save(output)
-        results.append(output)
+        t.save(results_file)
+        results.append(results_file)
 
     image = create_plots(results)
 
@@ -135,9 +142,11 @@ def create_tracker(high_precision: bool, files: list) -> np.ndarray:
 if __name__ == "__main__":
     interface = gr.Interface(
         fn=create_tracker,
-        inputs=[gr.Checkbox(value=False, label="High Precision"),
-                gr.File(file_count="multiple")],
-        outputs=gr.Image()
+        inputs=[
+            gr.components.CheckboxGroup(choices=["High precision tracking", "Debug mode"], label="Options"),
+            gr.components.File(file_count="multiple", label="Video files to track")
+        ],
+        outputs=gr.components.Image(type="numpy", label="Recoil patterns")
     )
 
     interface.launch(debug=True)
