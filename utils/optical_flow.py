@@ -3,8 +3,6 @@ from typing import Tuple
 import cv2
 import numpy as np
 
-from utils.tracker import Tracker
-
 # Parameters for lucas kanade optical flow:
 LK_PARAMS = dict(
     winSize=(150, 150),
@@ -31,7 +29,7 @@ FB_PARAMS = dict(
 )
 
 
-def lucas_kanade(tracker: Tracker,
+def lucas_kanade(tracker: "Tracker",
                  prev_frame: np.ndarray,
                  curr_frame: np.ndarray,
                  x1: float,
