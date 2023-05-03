@@ -48,11 +48,11 @@ def get_recoil_pattern(file: str) -> pd.DataFrame:
     return df
 
 
-def create_plots(files: List[str]) -> np.ndarray:
+def create_plots(files: List[str | Path]) -> np.ndarray:
     """
     Create the plots for the recoil pattern and movement.
 
-    @param file:    JSON file to read.
+    @param files: JSON files to read.
     @return:        Image of the plots.
     """
 
@@ -101,7 +101,7 @@ def create_plots(files: List[str]) -> np.ndarray:
     return im
 
 
-def create_tracker(high_precision: bool, files: list) -> List[np.ndarray]:
+def create_tracker(high_precision: bool, files: list) -> np.ndarray:
     """
     Create the tracker for the recoil pattern.
 
@@ -135,7 +135,8 @@ def create_tracker(high_precision: bool, files: list) -> List[np.ndarray]:
 if __name__ == "__main__":
     interface = gr.Interface(
         fn=create_tracker,
-        inputs=[gr.Checkbox(value=False, label="High Precision"), gr.File(file_count="multiple")],
+        inputs=[gr.Checkbox(value=False, label="High Precision"),
+                gr.File(file_count="multiple")],
         outputs=gr.Image()
     )
 
