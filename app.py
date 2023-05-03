@@ -43,7 +43,7 @@ def get_recoil_pattern(file: str) -> pd.DataFrame:
     df["combined_y"] = df.reticle_y + df.camera_y
     df["combined_y_move"] = df.combined_y - df.combined_y.shift(1)
     df["combined_y_color"] = df.combined_y_move.apply(lambda x: "red" if x > 0 else "blue")
-    df = df[["filename", "combined_x", "combined_y", "combined_y_color"]]
+    df = df[["filename", "combined_x", "combined_y", "combined_y_color", "camera_x", "camera_y"]]
 
     return df
 
@@ -65,10 +65,27 @@ def create_plots(files: List[str | Path]) -> np.ndarray:
     offset = 0
     labels = []
     for file in df.filename.unique():
+        # Test camera differences:
+        df_test = df[df.filename == file]
+        x_difference = df_test.camera_x.iloc[0] - df_test.camera_x.iloc[-1]
+        y_difference = df_test.camera_y.iloc[0] - df_test.camera_y.iloc[-1]
+        euc_distance = np.sqrt(x_difference ** 2 + y_difference ** 2)
+
+        # Add label for camera movement:
+        if euc_distance > 25:
+            label = {
+                "x": offset,
+                "y": df[df.filename == file].combined_y.max() + 15,
+                "s": f"CAMERA MISALIGNED {euc_distance:.0f}px",
+                "color": "red",
+                "horizontalalignment": "center"
+            }
+            labels.append(label)
+
         # Create labels for plot:
         label = {
             "x": offset,
-            "y": df[df.filename == file].combined_y.max() + 25,
+            "y": df[df.filename == file].combined_y.max() + 30,
             "s": file.replace("_", "\n"),
             "horizontalalignment": "center"
         }
