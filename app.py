@@ -1,4 +1,5 @@
 import io
+import multiprocessing
 from pathlib import Path
 from typing import List
 
@@ -116,10 +117,8 @@ def create_plots(files: List[str | Path]) -> np.ndarray:
     return im
 
 
-def track_file(file: Path, high_precision: bool, debug_level: int) -> Path:
-
+def track_file(filepath: str, high_precision: bool, debug_level: int) -> Path:
     # Get the file paths:
-    filepath = file.name
     results_file = Path("results", Path(filepath).stem[:-8]).with_suffix(".json")
 
     t = Tracker(
@@ -133,12 +132,13 @@ def track_file(file: Path, high_precision: bool, debug_level: int) -> Path:
     return results_file
 
 
-def create_tracker(checkboxes: List[str], files: list) -> np.ndarray:
+def create_tracker(checkboxes: List[str], files: list, num_processes: int = None) -> np.ndarray:
     """
     Create the tracker for the recoil pattern.
 
     @param checkboxes: List of checkbox names which are checked.
     @param files: List of additional files to track.
+    @param num_processes: Number of processes for tracking.
     @return:
     """
 
@@ -149,10 +149,11 @@ def create_tracker(checkboxes: List[str], files: list) -> np.ndarray:
     if files is None:
         files = []
 
-    images = []
-    results = []
-    for file in files:
-        results.append(track_file(file, high_precision, debug_level))
+    if num_processes is None:
+        num_processes = min(multiprocessing.cpu_count(), len(files))
+
+    with multiprocessing.Pool(processes=num_processes) as pool:
+        results = pool.starmap(track_file, [(file.name, high_precision, debug_level) for file in files])
 
     image = create_plots(results)
 
