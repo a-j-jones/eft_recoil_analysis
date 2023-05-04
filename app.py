@@ -116,6 +116,23 @@ def create_plots(files: List[str | Path]) -> np.ndarray:
     return im
 
 
+def track_file(file: Path, high_precision: bool, debug_level: int) -> Path:
+
+    # Get the file paths:
+    filepath = file.name
+    results_file = Path("results", Path(filepath).stem[:-8]).with_suffix(".json")
+
+    t = Tracker(
+        filepath,
+        high_precision=high_precision,
+        debug_level=debug_level
+    )
+    t.track()
+    t.save(results_file)
+
+    return results_file
+
+
 def create_tracker(checkboxes: List[str], files: list) -> np.ndarray:
     """
     Create the tracker for the recoil pattern.
@@ -135,21 +152,7 @@ def create_tracker(checkboxes: List[str], files: list) -> np.ndarray:
     images = []
     results = []
     for file in files:
-        filepath = file.name
-        if filepath is None:
-            continue
-
-        print(filepath)
-        video_file = Path(filepath).stem[:-8]
-        results_file = Path("results", video_file).with_suffix(".json")
-        t = Tracker(
-            filepath,
-            high_precision=high_precision,
-            debug_level=debug_level
-        )
-        t.track()
-        t.save(results_file)
-        results.append(results_file)
+        results.append(track_file(file, high_precision, debug_level))
 
     image = create_plots(results)
 
