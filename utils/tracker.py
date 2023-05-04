@@ -284,7 +284,7 @@ class Tracker:
         Loops through every frame in the video file and tracks each object which has been selected by the user.
         """
         process_id = int(multiprocessing.current_process().name.split("-")[1]) - 1
-        with tqdm(total=self.length, position=process_id, desc=f"Process: {process_id}") as pbar:
+        with tqdm(total=self.length, position=0, desc=f"Process: {process_id}") as pbar:
             while self.cap.more():
                 # Get new frame from the video:
                 self.frame = self.cap.read()
