@@ -1,6 +1,7 @@
 # Public packages:
 import glob
 import json
+import multiprocessing
 from pathlib import Path
 from typing import Tuple, Optional
 
@@ -282,7 +283,8 @@ class Tracker:
         """
         Loops through every frame in the video file and tracks each object which has been selected by the user.
         """
-        with tqdm(total=self.length) as pbar:
+        process_id = int(multiprocessing.current_process().name.split("-")[1]) - 1
+        with tqdm(total=self.length, position=process_id, desc=f"Process: {process_id}") as pbar:
             while self.cap.more():
                 # Get new frame from the video:
                 self.frame = self.cap.read()
