@@ -163,7 +163,10 @@ if __name__ == "__main__":
             gr.components.CheckboxGroup(choices=["High precision tracking", "Debug mode"], label="Options"),
             gr.components.File(file_count="multiple", label="Video files to track")
         ],
-        outputs=gr.components.Image(type="numpy", label="Recoil patterns")
+        outputs=gr.components.Image(type="numpy", label="Recoil patterns"),
+        title="Recoil pattern tracker",
+        description="This tool was designed to track the recoil pattern of a weapon in Escape from Tarkov.",
+        allow_flagging="never",
     )
 
     interface.launch(debug=True)
