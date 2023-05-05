@@ -1,5 +1,7 @@
-tqdm
+pillow
 imutils
-numpy
 opencv-python
+tqdm
+numpy
+pandas
 gradio
