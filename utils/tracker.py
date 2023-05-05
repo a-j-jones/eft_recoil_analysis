@@ -2,6 +2,7 @@
 import glob
 import json
 import multiprocessing
+import os
 from pathlib import Path
 from typing import Tuple, Optional
 
@@ -143,6 +144,10 @@ class Tracker:
         self.frame_grey = self.frame = self.prev_frame = self.orig_frame = None
         self.video_file = video_file
 
+        # Check if video file exists:
+        if not os.path.isfile(video_file):
+            raise FileNotFoundError(f"Video file {video_file} not found.")
+
         # Get number of frames and initial frame:
         video = cv2.VideoCapture(video_file)
         self.length = video.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -283,7 +288,13 @@ class Tracker:
         """
         Loops through every frame in the video file and tracks each object which has been selected by the user.
         """
-        process_id = int(multiprocessing.current_process().name.split("-")[1]) - 1
+
+        process_name = multiprocessing.current_process().name
+        if process_name == "MainProcess":
+            process_id = 0
+        else:
+            process_id = int(multiprocessing.current_process().name.split("-")[1]) - 1
+
         with tqdm(total=self.length, position=0, desc=f"Process: {process_id}") as pbar:
             while self.cap.more():
                 # Get new frame from the video:
