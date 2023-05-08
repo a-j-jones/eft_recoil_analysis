@@ -6,7 +6,7 @@ import gradio as gr
 import numpy as np
 from PIL import ImageFile
 
-from utils.plotting import create_plots
+from utils.plotting import create_plots, fig_to_img
 from utils.tracker import Tracker
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -48,7 +48,8 @@ def create_tracker(num_processes: float, checkboxes: List[str], files: list) -> 
     with multiprocessing.Pool(processes=num_processes) as pool:
         results = pool.starmap(track_file, [(file.name, high_precision, debug_level) for file in files])
 
-    image = create_plots(results)
+    fig = create_plots(results)
+    image = fig_to_img(fig)
 
     return image
 
