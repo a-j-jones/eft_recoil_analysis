@@ -130,7 +130,7 @@ def create_plots(files: List[str | Path]) -> plt.Figure:
 
         # Find the individual shots and scatter plot them:
         diff_arr = (df_plot.combined_y - df_plot.combined_y.shift(1))
-        peaks, _ = find_peaks(diff_arr, height=diff_arr.mean() + 1, distance=3)
+        peaks, _ = find_peaks(diff_arr, height=(diff_arr.max()*0.25), distance=3)
         shots = df_plot.iloc[peaks - 1]
 
         # Spray pattern plotted
