@@ -54,8 +54,14 @@ def get_recoil_pattern(file: str) -> pd.DataFrame:
     df = pd.read_json(file).set_index("frame")
 
     df["filename"] = Path(file).stem
+
+    # Reticle processing
     df[["reticle_x", "reticle_y"]] = pd.DataFrame(df.reticle.tolist(), index=df.index)
+    df["reticle_y"] = df["reticle_y"] * -1
+
     df[["camera_x", "camera_y"]] = pd.DataFrame(df["optical_flow"].tolist(), index=df.index)
+    df["camera_x"] = df["camera_x"] * -1
+
     for col in ["camera_x", "camera_y"]:
         df[col] = df[col].cumsum()
 
@@ -124,7 +130,7 @@ def create_plots(files: List[str | Path]) -> plt.Figure:
             df_plot.combined_y,
             color=SCATTER_COLOUR,
             linewidth=1,
-            alpha=0.5,
+            alpha=0.25,
             zorder=1
         )
 

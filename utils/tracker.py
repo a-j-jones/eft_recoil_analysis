@@ -4,10 +4,11 @@ import json
 import multiprocessing
 import os
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 import cv2
 import numpy as np
+import pandas as pd
 from imutils import resize
 from imutils.video import FileVideoStream
 from numpy import ndarray
@@ -244,7 +245,7 @@ class Tracker:
         prev_frame = self.prev_frame[y1:y2, x1:x2]
 
         if high_precision:
-            movement, lines = farneback(prev_frame, curr_frame, x1, y1)
+            movement, lines = farneback(prev_frame, curr_frame, x1, y1, self.frame_id)
         else:
             movement, lines = lucas_kanade(self, prev_frame, curr_frame, x1, y1)
 
@@ -322,16 +323,18 @@ class Tracker:
                 # Track objects:
                 self.track_object(self.reticle)
 
+                camera_factor = 1
                 self.data.append({
                     "filename": self.video_file,
                     "frame": self.frame_id,
                     "reticle": self.reticle.middle,
-                    "optical_flow": camera_shake
+                    "optical_flow": (camera_shake[0] * camera_factor, camera_shake[1] * camera_factor)
                 })
 
                 # Show frame:
                 if self.debug_level > 0:
-                    self.draw_recoil()
+                    self.shift_frame()
+                    self.draw_recoil(rel_start_x=0.5)
                     cv2.imshow("Frame", self.frame)
                     cv2.waitKey(15)
 
@@ -341,21 +344,28 @@ class Tracker:
             self.cap.stop()
             cv2.destroyAllWindows()
 
-    def draw_recoil(self, rel_start_x=0.4, rel_start_y=0.5) -> None:
+    def draw_recoil(self, rel_start_x: float = 0.5, rel_start_y: float = 0.5, recoil_types: List[str] = None) -> None:
         """
         Draws the recoil pattern on the frame in real time as a debugging tool:
 
         @param rel_start_x: Relative start x position of the recoil (percentage of screen)
         @param rel_start_y: Relative start y position of the recoil (percentage of screen)
+        @param recoil_types: List of recoil types to draw (e.g. ["combined", "camera", "reticle"])
         """
+
+        if recoil_types is None:
+            recoil_types = ["combined"]
+
         start_x = rel_start_x * self.frame.shape[1]
         start_y = rel_start_y * self.frame.shape[0]
 
+        scale_by = 0.91
+
         arrs = {
-            "reticle_x": np.array([x["reticle"][0] for x in self.data]),
-            "reticle_y": np.array([x["reticle"][1] for x in self.data]),
-            "camera_x": np.array([x["optical_flow"][0] for x in self.data]),
-            "camera_y": np.array([x["optical_flow"][1] for x in self.data])
+            "reticle_x": np.array([x["reticle"][0] for x in self.data]) * scale_by,
+            "reticle_y": np.array([x["reticle"][1] for x in self.data]) * scale_by * -1,
+            "camera_x": np.array([x["optical_flow"][0] for x in self.data]) * scale_by * -1,
+            "camera_y": np.array([x["optical_flow"][1] for x in self.data]) * scale_by
         }
 
         # Shifts:
@@ -377,23 +387,39 @@ class Tracker:
             # Combined:
             arrs[f"combined_{axis}"] = arrs[f"reticle_{axis}"] + arrs[f"camera_{axis}"]
 
-        x_arr = arrs[f"combined_x"]
-        y_arr = arrs[f"combined_y"] * -1
+        for type in recoil_types:
+            x_arr = arrs[f"{type}_x"]
+            y_arr = arrs[f"{type}_y"] * -1
 
-        for i in range(len(y_arr)):
-            if i == 0:
-                continue
+            for i in range(len(y_arr)):
+                if i == 0:
+                    continue
 
-            cv2.line(self.frame,
-                     (int(x_arr[i] + start_x), int(y_arr[i] + start_y)),
-                     (int(x_arr[i - 1] + start_x), int(y_arr[i - 1] + start_y)),
-                     (0, 255, 0), thickness=4, lineType=8)
+                # Draw recoil:
+                cv2.line(self.frame,
+                         (int(x_arr[i] + start_x), int(y_arr[i] + start_y)),
+                         (int(x_arr[i - 1] + start_x), int(y_arr[i - 1] + start_y)),
+                         (0, 255, 0), thickness=4, lineType=8)
 
-            cv2.putText(self.frame, "Recoil", (int(start_x - 20), int(start_y + 25)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.4,
-                        (255, 255, 255),
-                        1)
+                cv2.putText(self.frame, type, (int(start_x - 20), int(start_y + 25)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.4,
+                            (255, 255, 255),
+                            1)
+
+            start_x += 100
+
+    def shift_frame(self) -> None:
+        df = pd.DataFrame(self.data)
+        df[["camera_x", "camera_y"]] = pd.DataFrame(df["optical_flow"].tolist(), index=df.index)
+        for col in ["camera_x", "camera_y"]:
+            df[col] = df[col].cumsum()
+
+        X = df["camera_x"].iloc[-1]
+        Y = df["camera_y"].iloc[-1]
+
+        M = np.float32([[1, 0, -X], [0, 1, -Y]])
+        self.frame = cv2.warpAffine(self.frame, M, (self.frame.shape[1], self.frame.shape[0]))
 
     def save(self, filename: Optional[Path | str] = None) -> None:
         """
