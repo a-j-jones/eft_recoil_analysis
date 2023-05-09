@@ -3,31 +3,6 @@ from typing import Tuple
 import cv2
 import numpy as np
 
-# Parameters for lucas kanade optical flow:
-LK_PARAMS = dict(
-    winSize=(150, 150),
-    maxLevel=3,
-    criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
-)
-MAX_CORNERS = 50
-FEATURE_PARAMS = dict(
-    maxCorners=MAX_CORNERS,
-    qualityLevel=0.1,
-    minDistance=10,
-    blockSize=3
-)
-
-# Parameters for farneback optical flow:
-FB_PARAMS = dict(
-    pyr_scale=0.1,
-    levels=3,
-    winsize=100,
-    iterations=4,
-    poly_n=9,
-    poly_sigma=1.2,
-    flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN
-)
-
 
 def lucas_kanade(tracker: "Tracker",
                  prev_frame: np.ndarray,
@@ -45,6 +20,20 @@ def lucas_kanade(tracker: "Tracker",
     @param y1: Top-left y coordinate of the portion of frame to track
     @return:
     """
+
+    # Parameters for lucas kanade optical flow:
+    LK_PARAMS = dict(
+        winSize=(150, 150),
+        maxLevel=3,
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
+    )
+    MAX_CORNERS = 50
+    FEATURE_PARAMS = dict(
+        maxCorners=MAX_CORNERS,
+        qualityLevel=0.1,
+        minDistance=10,
+        blockSize=3
+    )
 
     if tracker.new_points is None or len(tracker.new_points) < (MAX_CORNERS * 0.75) or tracker.find_new_points:
         tracker.old_points = cv2.goodFeaturesToTrack(prev_frame,
@@ -76,7 +65,8 @@ def lucas_kanade(tracker: "Tracker",
 def farneback(prev_frame: np.ndarray,
               curr_frame: np.ndarray,
               x1: float,
-              y1: float
+              y1: float,
+              frame: int = 0,
               ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculate the movement of the frame using the Farneback method.
@@ -85,8 +75,23 @@ def farneback(prev_frame: np.ndarray,
     @param curr_frame: Current video frame
     @param x1: Top-left x coordinate of the portion of frame to track
     @param y1: Top-left y coordinate of the portion of frame to track
+    @param frame: Frame number
     @return:
     """
+    # Parameters for farneback optical flow:
+    FB_PARAMS = dict(
+        pyr_scale=0.1,
+        levels=3,
+        winsize=100,
+        iterations=4,
+        poly_n=9,
+        poly_sigma=1.2,
+        flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN
+    )
+
+    # if frame > 50:
+    #     FB_PARAMS["winsize"] = int(FB_PARAMS["winsize"] * 0.75)
+    #     pass
 
     # Calculate the movement:
     flow = cv2.calcOpticalFlowFarneback(prev_frame, curr_frame, None, **FB_PARAMS)
