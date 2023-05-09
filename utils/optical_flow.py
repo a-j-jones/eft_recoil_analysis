@@ -89,9 +89,9 @@ def farneback(prev_frame: np.ndarray,
         flags=cv2.OPTFLOW_FARNEBACK_GAUSSIAN
     )
 
-    # if frame > 50:
-    #     FB_PARAMS["winsize"] = int(FB_PARAMS["winsize"] * 0.75)
-    #     pass
+    if frame > 100:
+        FB_PARAMS["winsize"] = int(FB_PARAMS["winsize"] * 0.75)
+        pass
 
     # Calculate the movement:
     flow = cv2.calcOpticalFlowFarneback(prev_frame, curr_frame, None, **FB_PARAMS)
