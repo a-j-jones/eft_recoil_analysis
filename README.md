@@ -4,7 +4,8 @@ This project uses opencv to track objects within a recorded video in order to an
 The tool is specifically designed for use within Escape From Tarkov, however in theory it should work for other games.
 
 <p align="center">
-   <img src="https://user-images.githubusercontent.com/64594018/188312056-c76147cb-56ca-43fd-b427-5ddaaf663361.gif" />
+   <img src="https://user-images.githubusercontent.com/64594018/188312056-c76147cb-56ca-43fd-b427-5ddaaf663361.gif" height="400"/>
+   <img src="https://github-production-user-asset-6210df.s3.amazonaws.com/64594018/237169331-496c91a5-b22a-4d9e-8d77-2a4f7c11b7fc.png" height="400"/>
 </p>
 
 ## Installation:
@@ -26,13 +27,13 @@ From there you can open the url and use the interface to upload your video files
  - **Debug mode:** This option will show the tracking in real time. This is useful for testing the tracking on a video file before running the tool on a large number of files. (Note: This was designed to be used with a single video file and may cause problems if multiple files are uploaded in debug mode)
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/64594018/236353323-f33a9c2f-48df-4ae4-93d5-b39683ae0a44.png" />
+  <img src="https://user-images.githubusercontent.com/64594018/236353323-f33a9c2f-48df-4ae4-93d5-b39683ae0a44.png" width="600"/>
 </p>
 
 Once tracking has finished for all of the uploaded files, you will be able to see output such as the following:
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/64594018/236354280-898823ea-f0e6-4731-b7e8-1a32db1dded2.png" />
+  <img src="https://github-production-user-asset-6210df.s3.amazonaws.com/64594018/237169331-496c91a5-b22a-4d9e-8d77-2a4f7c11b7fc.png"  width="600"/>
 </p>
 
 ## Usage notes:

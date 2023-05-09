@@ -90,7 +90,7 @@ def farneback(prev_frame: np.ndarray,
     )
 
     if frame > 100:
-        FB_PARAMS["winsize"] = int(FB_PARAMS["winsize"] * 0.75)
+        FB_PARAMS["winsize"] = int(FB_PARAMS["winsize"] * 1)
         pass
 
     # Calculate the movement:
