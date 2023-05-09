@@ -4,8 +4,8 @@ This project uses opencv to track objects within a recorded video in order to an
 The tool is specifically designed for use within Escape From Tarkov, however in theory it should work for other games.
 
 <p align="center">
-   <img src="https://user-images.githubusercontent.com/64594018/188312056-c76147cb-56ca-43fd-b427-5ddaaf663361.gif" height="400"/>
-   <img src="https://github-production-user-asset-6210df.s3.amazonaws.com/64594018/237169331-496c91a5-b22a-4d9e-8d77-2a4f7c11b7fc.png" height="400"/>
+   <img src="https://user-images.githubusercontent.com/64594018/188312056-c76147cb-56ca-43fd-b427-5ddaaf663361.gif" height="350"/>
+   <img src="https://github-production-user-asset-6210df.s3.amazonaws.com/64594018/237169331-496c91a5-b22a-4d9e-8d77-2a4f7c11b7fc.png" height="350"/>
 </p>
 
 ## Installation:
